@@ -1,0 +1,4 @@
+{"ts":"2026-04-25T09:46:09.759Z","level":"INFO","msg":"Iniciando proceso","data":{"mode":"dry-run","date":"2026-04-25","fromFixture":"tools/whatsapp-address-extractor/examples/sample-day.json","outputDir":"/workspace/gianai/tools/whatsapp-address-extractor/output","enableOcr":false,"enableVision":false,"minConfidenceForNoVision":0.78}}
+{"ts":"2026-04-25T09:46:09.765Z","level":"INFO","msg":"Usando fixture local","data":{"fromFixture":"tools/whatsapp-address-extractor/examples/sample-day.json"}}
+{"ts":"2026-04-25T09:46:09.765Z","level":"INFO","msg":"Fotos detectadas","data":{"total":4}}
+{"ts":"2026-04-25T09:46:09.771Z","level":"INFO","msg":"Pipeline finalizado","data":{"reports":{"jsonPath":"/workspace/gianai/tools/whatsapp-address-extractor/output/2026-04-25/resultado.json","csvPath":"/workspace/gianai/tools/whatsapp-address-extractor/output/2026-04-25/resultado.csv"},"total":4}}
