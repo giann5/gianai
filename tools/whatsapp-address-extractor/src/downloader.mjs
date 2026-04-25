@@ -43,11 +43,16 @@ export async function saveImageRecord({ message, imageMeta, resolvedAddress, out
   logger?.info('Intentando descargar imagen', debugMeta);
 
   if (dryRun) {
-    return { targetPath, filename, success: false, dryRun: true, reason: 'dry-run' };
+    return { targetPath, filename, success: true, dryRun: true, reason: 'dry-run' };
   }
 
   try {
     let buffer = null;
+
+    if (isKnownTinyPreview(imageMeta)) {
+      return { targetPath: '', filename: '', success: false, skipped: true, reason: 'tiny_preview_ignored' };
+    }
+
 
     buffer = decodeDataUrl(imageMeta?.currentSrc || imageMeta?.src || '');
     if (!buffer) {
@@ -222,6 +227,18 @@ async function downloadFromViewer({ messageId, imageIndex, runtime, logger }) {
     await page.keyboard.press('Escape').catch(() => null);
     return null;
   }
+}
+
+
+function isKnownTinyPreview(imageMeta) {
+  const w = imageMeta?.naturalWidth || 0;
+  const h = imageMeta?.naturalHeight || 0;
+  const src = imageMeta?.currentSrc || imageMeta?.src || '';
+  const className = imageMeta?.className || '';
+  if (/^data:image\/gif/i.test(src)) return true;
+  if ((w <= 80 || h <= 80) && src.startsWith('data:')) return true;
+  if (/x14tgpju/i.test(className) && src.startsWith('data:')) return true;
+  return false;
 }
 
 function inferExtension(imageMeta) {

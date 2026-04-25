@@ -6,16 +6,29 @@ const ADDRESS_RE = new RegExp(
 
 const CORNER_RE = /([a-záéíóúñ0-9.\-\s]{2,})\s*(?:y|esq\.?|esquina)\s*([a-záéíóúñ0-9.\-\s]{2,})/i;
 
+const BAD_TOKENS = [
+  'tail-in',
+  'forward-refreshed',
+  'reenviado',
+  'abrir foto',
+  'foto',
+  'ver reacciones',
+  'reaccion',
+];
+
+const KNOWN_SENDERS = ['daniel freire', 'jorge teira'];
+
 export function parseAddress(text) {
-  if (!text) {
+  const clean = cleanWhatsAppTextForAddress(text);
+
+  if (!clean) {
     return { hasAddress: false, confidence: 0, source: 'none', note: 'texto vacio' };
   }
 
-  const clean = normalizeText(text);
   const match = clean.match(ADDRESS_RE);
   if (match) {
     const street = normalizeStreet(match[1]);
-    const number = match[2];
+    const number = trimStreetNumber(match[2]);
     return {
       hasAddress: true,
       street,
@@ -24,6 +37,21 @@ export function parseAddress(text) {
       confidence: 0.6,
       source: 'none',
       note: 'regex calle+altura',
+    };
+  }
+
+  const swapped = clean.match(/^(\d{1,5})\s+([a-záéíóúñ][a-záéíóúñ\s.'-]{2,})$/i);
+  if (swapped) {
+    const street = normalizeStreet(swapped[2]);
+    const number = trimStreetNumber(swapped[1]);
+    return {
+      hasAddress: true,
+      street,
+      number,
+      normalizedAddress: `${street} ${number}`,
+      confidence: 0.62,
+      source: 'none',
+      note: 'regex altura+calle',
     };
   }
 
@@ -44,8 +72,34 @@ export function parseAddress(text) {
   return { hasAddress: false, confidence: 0, source: 'none', note: 'sin patron direccion' };
 }
 
+export function cleanWhatsAppTextForAddress(input) {
+  if (!input) return '';
+
+  let text = normalizeText(input);
+
+  for (const token of BAD_TOKENS) {
+    const re = new RegExp(`\\b${escapeRegex(token)}\\b`, 'gi');
+    text = text.replace(re, ' ');
+  }
+
+  text = text.replace(/\b\d{1,2}:\d{2}(?:\d{1,2}:\d{2})*\b/g, ' '); // 22:37 y 22:3722:37
+  text = text.replace(/\b(\d{1,5})(\d{2}:\d{2})\b/g, '$1 '); // 85322:37
+  text = text.replace(/\b(R\d{1,3})(\d{2}:\d{2})\b/gi, '$1 '); // R316:42
+
+  text = text.replace(/([a-záéíóúñ])([0-9])/gi, '$1 $2');
+  text = text.replace(/([0-9])([a-záéíóúñ])/gi, '$1 $2');
+
+  for (const sender of KNOWN_SENDERS) {
+    const prefixRe = new RegExp(`^\\s*${escapeRegex(sender)}\\s*`, 'i');
+    text = text.replace(prefixRe, '');
+  }
+
+  text = text.replace(/\s+/g, ' ').trim();
+  return text;
+}
+
 export function normalizeText(input) {
-  return input
+  return String(input)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
@@ -59,4 +113,12 @@ function normalizeStreet(street) {
     .replace(/\bc\b/i, 'Calle')
     .replace(/\s+/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function trimStreetNumber(numberText) {
+  return String(numberText).match(/^\d{1,5}/)?.[0] || numberText;
+}
+
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -1,5 +1,6 @@
 export const SCORE_WEIGHTS = {
   caption: 0.92,
+  image_alt: 0.9,
   previous_1: 0.9,
   previous_2_3: 0.75,
   next_1: 0.82,
@@ -35,6 +36,7 @@ export function classifyByScore(score) {
 
 function resolveWeight(source, distance) {
   if (source === 'caption') return SCORE_WEIGHTS.caption;
+  if (source === 'image_alt') return SCORE_WEIGHTS.image_alt;
   if (source === 'previous') {
     if (distance <= 1) return SCORE_WEIGHTS.previous_1;
     return SCORE_WEIGHTS.previous_2_3;

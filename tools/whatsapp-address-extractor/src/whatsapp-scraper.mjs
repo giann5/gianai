@@ -7,7 +7,7 @@ export async function collectMessagesForDay({ date, fromFixture, logger, mode, d
   if (fromFixture) {
     logger.info('Usando fixture local', { fromFixture, mode });
     const messages = JSON.parse(fs.readFileSync(fromFixture, 'utf-8'));
-    return { messages, runtime: null };
+    return { messages, runtime: null, scrapeStats: {} };
   }
 
   const playwright = await safeImportPlaywright(logger);
@@ -37,7 +37,7 @@ export async function collectMessagesForDay({ date, fromFixture, logger, mode, d
 
   await saveDomSnapshot(page, debugDir);
 
-  const messages = await scrapeTimeline(page, date, logger);
+  const { messages, stats } = await scrapeTimeline(page, date, logger);
   const imageCount = messages.reduce((acc, m) => acc + (m.images?.length || 0), 0);
 
   if (messages.length === 0 || imageCount === 0) {
@@ -62,7 +62,7 @@ export async function collectMessagesForDay({ date, fromFixture, logger, mode, d
     },
   };
 
-  return { messages, runtime };
+  return { messages, runtime, scrapeStats: stats };
 }
 
 export async function waitForUserEnter(promptText) {
@@ -108,8 +108,15 @@ async function saveDomSnapshot(page, debugDir) {
 }
 
 async function scrapeTimeline(page, targetDate, logger) {
-  const raw = await page.evaluate(async ({ targetDate }) => {
+  const result = await page.evaluate(async ({ targetDate }) => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    const stats = {
+      rawImageNodes: 0,
+      ignoredSmallDataImages: 0,
+      ignoredEmojiImages: 0,
+      candidateRealImages: 0,
+    };
 
     function pickMessageNodes() {
       const sets = [
@@ -130,6 +137,76 @@ async function scrapeTimeline(page, targetDate, logger) {
       return merged;
     }
 
+    function estimateDataBytes(src) {
+      if (!src?.startsWith('data:image/')) return null;
+      const payload = src.split(',')[1] || '';
+      return Math.floor((payload.length * 3) / 4);
+    }
+
+    function looksEmoji(text) {
+      if (!text) return false;
+      const t = text.trim();
+      return /^[\p{Emoji}\p{Extended_Pictographic}\s]+$/u.test(t);
+    }
+
+    function srcType(src, currentSrc) {
+      const u = currentSrc || src || '';
+      if (u.startsWith('data:')) return 'data';
+      if (u.startsWith('blob:')) return 'blob';
+      if (u.startsWith('https:')) return 'https';
+      return 'empty';
+    }
+
+    function shouldIgnoreImage(meta) {
+      const isSmall = meta.naturalWidth <= 80 || meta.naturalHeight <= 80;
+      const isTinyBytes = meta.estimatedBytes !== null && meta.estimatedBytes < 5 * 1024;
+      const isDataPlaceholder = meta.srcType === 'data' && /x14tgpju/i.test(meta.className || '');
+      const isGifPixel = /^data:image\/gif/i.test(meta.src || meta.currentSrc || '');
+      const isReaction = /reaccion|reacción|ver reacciones/i.test(meta.nearestAriaLabel || '') || looksEmoji(meta.alt || '');
+      const isAvatarOrIcon = /avatar|icon|sticker|emoji/i.test(meta.className || '');
+
+      if (isReaction || isGifPixel) return 'emoji';
+      if (isSmall || isTinyBytes || isDataPlaceholder || isAvatarOrIcon) return 'small';
+      return '';
+    }
+
+    function normalizeAlt(alt) {
+      return (alt || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    function pickRealImages(images) {
+      const groupedByAlt = new Map();
+      for (const img of images) {
+        const key = normalizeAlt(img.alt || `idx-${img.imageIndex}`);
+        if (!groupedByAlt.has(key)) groupedByAlt.set(key, []);
+        groupedByAlt.get(key).push(img);
+      }
+
+      const merged = [];
+      for (const group of groupedByAlt.values()) {
+        group.sort((a, b) => {
+          const typeScore = (t) => (t === 'blob' ? 3 : t === 'https' ? 2 : t === 'data' ? 1 : 0);
+          const areaA = a.naturalWidth * a.naturalHeight;
+          const areaB = b.naturalWidth * b.naturalHeight;
+          return typeScore(b.srcType) - typeScore(a.srcType) || areaB - areaA;
+        });
+        merged.push(group[0]);
+      }
+
+      merged.sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight);
+
+      if (merged.length <= 1) return merged;
+
+      const top = merged[0];
+      const topArea = top.naturalWidth * top.naturalHeight;
+      const realAlbum = merged.filter((img) => {
+        const area = img.naturalWidth * img.naturalHeight;
+        return img.srcType !== 'data' && area >= topArea * 0.8;
+      });
+
+      return realAlbum.length > 1 ? realAlbum : [top];
+    }
+
     const main = document.querySelector('#main');
     const scroller = main?.querySelector('[tabindex="-1"]') || main?.querySelector('[role="application"]') || main;
 
@@ -147,13 +224,16 @@ async function scrapeTimeline(page, targetDate, logger) {
       const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
 
       const imgs = Array.from(node.querySelectorAll('img'));
-      const images = imgs.map((img, imageIndex) => {
+      stats.rawImageNodes += imgs.length;
+
+      const mapped = imgs.map((img, imageIndex) => {
         const src = img.getAttribute('src') || '';
         const currentSrc = img.currentSrc || '';
         const nearestLabel =
           img.closest('[aria-label]')?.getAttribute('aria-label') ||
           node.getAttribute('aria-label') ||
           '';
+        const estimatedBytes = estimateDataBytes(currentSrc || src);
 
         return {
           imageIndex,
@@ -164,21 +244,30 @@ async function scrapeTimeline(page, targetDate, logger) {
           clientWidth: img.clientWidth || 0,
           clientHeight: img.clientHeight || 0,
           alt: img.getAttribute('alt') || '',
+          className: img.className || '',
           nearestAriaLabel: nearestLabel,
-          srcType: src.startsWith('data:') || currentSrc.startsWith('data:')
-            ? 'data'
-            : src.startsWith('blob:') || currentSrc.startsWith('blob:')
-              ? 'blob'
-              : src.startsWith('https:') || currentSrc.startsWith('https:')
-                ? 'https'
-                : 'empty',
+          srcType: srcType(src, currentSrc),
+          estimatedBytes,
           outerHtmlSnippet: img.outerHTML?.slice(0, 300) || '',
         };
       });
 
+      const filtered = [];
+      for (const img of mapped) {
+        const reason = shouldIgnoreImage(img);
+        if (!reason) {
+          filtered.push(img);
+          continue;
+        }
+        if (reason === 'emoji') stats.ignoredEmojiImages += 1;
+        else stats.ignoredSmallDataImages += 1;
+      }
+
+      const realImages = pickRealImages(filtered);
+      stats.candidateRealImages += realImages.length;
+
       const hasMediaByAttr = /(image|foto|media|video)/i.test(node.getAttribute('aria-label') || '');
-      const hasMediaButtonNearby = Boolean(node.querySelector('[aria-label*="Download" i], [aria-label*="descarg" i], [data-testid*="download" i]'));
-      const kind = images.length > 0 || hasMediaByAttr || hasMediaButtonNearby ? 'image' : 'text';
+      const kind = realImages.length > 0 || hasMediaByAttr ? 'image' : 'text';
 
       const prePlain = node.getAttribute('data-pre-plain-text') || '';
       const timeMatch = prePlain.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]/);
@@ -202,21 +291,22 @@ async function scrapeTimeline(page, targetDate, logger) {
         kind,
         text,
         caption: text,
-        imageUrl: images[0]?.currentSrc || images[0]?.src || '',
-        images,
+        imageUrl: realImages[0]?.currentSrc || realImages[0]?.src || '',
+        images: realImages,
       });
     }
 
-    return items;
+    return { items, stats };
   }, { targetDate });
 
   logger.info('Scraping finalizado', {
-    totalRows: raw.length,
-    imageRows: raw.filter((r) => r.kind === 'image').length,
-    totalImageNodes: raw.reduce((acc, r) => acc + (r.images?.length || 0), 0),
+    totalRows: result.items.length,
+    imageRows: result.items.filter((r) => r.kind === 'image').length,
+    totalImageNodes: result.stats.rawImageNodes,
+    ...result.stats,
   });
 
-  return raw;
+  return { messages: result.items, stats: result.stats };
 }
 
 async function safeImportPlaywright(logger) {
