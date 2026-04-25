@@ -1,0 +1,54 @@
+[
+  {
+    "fecha": "2026-04-25",
+    "hora": "14:32:05",
+    "archivo": "2026-04-25__Av_Rivadavia_1234__14-32__confianza_81.jpg",
+    "direccion_detectada": "Av. Rivadavia 1234",
+    "calle": "Av. Rivadavia",
+    "altura": "1234",
+    "fuente": "previous",
+    "confianza": 0.81,
+    "mensaje_relacionado": "",
+    "estado": "OK",
+    "motivo": "confianza media-alta"
+  },
+  {
+    "fecha": "2026-04-25",
+    "hora": "14:32:50",
+    "archivo": "2026-04-25__REVISAR__foto_002.jpg",
+    "direccion_detectada": "Calle San Martin 345",
+    "calle": "Calle San Martin",
+    "altura": "345",
+    "fuente": "next",
+    "confianza": 0.75,
+    "mensaje_relacionado": "otra toma",
+    "estado": "REVISAR",
+    "motivo": "conflicto entre candidatos cercanos"
+  },
+  {
+    "fecha": "2026-04-25",
+    "hora": "15:10:12",
+    "archivo": "2026-04-25__REVISAR__foto_003.jpg",
+    "direccion_detectada": "Calle San Martin 345",
+    "calle": "Calle San Martin",
+    "altura": "345",
+    "fuente": "caption",
+    "confianza": 0.82,
+    "mensaje_relacionado": "Calle San Martín 345",
+    "estado": "REVISAR",
+    "motivo": "conflicto entre candidatos cercanos"
+  },
+  {
+    "fecha": "2026-04-25",
+    "hora": "16:05:17",
+    "archivo": "2026-04-25__REVISAR__foto_004.jpg",
+    "direccion_detectada": "Calle San Martin 345",
+    "calle": "Calle San Martin",
+    "altura": "345",
+    "fuente": "previous",
+    "confianza": 0.81,
+    "mensaje_relacionado": "",
+    "estado": "REVISAR",
+    "motivo": "conflicto entre candidatos cercanos"
+  }
+]

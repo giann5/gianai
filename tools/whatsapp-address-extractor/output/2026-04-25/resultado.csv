@@ -1,0 +1,5 @@
+fecha,hora,archivo,direccion_detectada,calle,altura,fuente,confianza,mensaje_relacionado,estado,motivo
+2026-04-25,14:32:05,2026-04-25__Av_Rivadavia_1234__14-32__confianza_81.jpg,Av. Rivadavia 1234,Av. Rivadavia,1234,previous,0.81,,OK,confianza media-alta
+2026-04-25,14:32:50,2026-04-25__REVISAR__foto_002.jpg,Calle San Martin 345,Calle San Martin,345,next,0.75,otra toma,REVISAR,conflicto entre candidatos cercanos
+2026-04-25,15:10:12,2026-04-25__REVISAR__foto_003.jpg,Calle San Martin 345,Calle San Martin,345,caption,0.82,Calle San Martín 345,REVISAR,conflicto entre candidatos cercanos
+2026-04-25,16:05:17,2026-04-25__REVISAR__foto_004.jpg,Calle San Martin 345,Calle San Martin,345,previous,0.81,,REVISAR,conflicto entre candidatos cercanos
