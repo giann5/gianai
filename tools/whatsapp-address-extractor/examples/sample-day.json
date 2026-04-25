@@ -1,0 +1,44 @@
+[
+  {
+    "id": "m1",
+    "timestampIso": "2026-04-25T14:30:10.000Z",
+    "direction": "in",
+    "kind": "text",
+    "text": "Av rivadavia 1234"
+  },
+  {
+    "id": "m2",
+    "timestampIso": "2026-04-25T14:32:05.000Z",
+    "direction": "in",
+    "kind": "image",
+    "caption": ""
+  },
+  {
+    "id": "m3",
+    "timestampIso": "2026-04-25T14:32:50.000Z",
+    "direction": "in",
+    "kind": "image",
+    "caption": "otra toma"
+  },
+  {
+    "id": "m4",
+    "timestampIso": "2026-04-25T15:10:12.000Z",
+    "direction": "in",
+    "kind": "image",
+    "caption": "Calle San Martín 345"
+  },
+  {
+    "id": "m5",
+    "timestampIso": "2026-04-25T16:05:17.000Z",
+    "direction": "in",
+    "kind": "image",
+    "caption": ""
+  },
+  {
+    "id": "m6",
+    "timestampIso": "2026-04-25T16:06:01.000Z",
+    "direction": "in",
+    "kind": "text",
+    "text": "es en pje flores 778"
+  }
+]
